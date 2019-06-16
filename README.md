@@ -5,12 +5,14 @@ Blender Addon that creates primitives that can be changed after they are created
 Creates Changable Primitives which are primitives that can be changed even after they are moved, rotated, scaled, etc.  
 Great for starting rough models.  
 ### Features
-* Currently support mesh types  
+* Currently supports mesh types  
   * Plane
   * Cube
   * Circle
 * Supports Linked Objects  
 Changable Primitives duplicated with Linked Duplicate will share properties.
+* Supports Modifiers
+You can add modifiers to Changable Primitives to change their shape while still being able to change their properties.
 
 ## Installation  
 ### Requirements  
@@ -28,6 +30,10 @@ You can add a modifier empty from...
 * 3D View > Operator Search > Create \*Changable Primitive name\*  
 ## Notes
 Not feature complete yet.  
+
+Do not edit the Changable Primtive's mesh in Edit mode.  
+Any changes made to the mesh in Edit mode will be lost when any of the Changable Primitive's properties is changed.  
+If you need to make changes to the shape while being able to customize the properties, use a Lattice.
 
 Sometimes entering Edit mode after creating a Changable Primitive will cause odd shading to happen.  
 Leaving and entering Edit mode again usually corrects the shading.  
