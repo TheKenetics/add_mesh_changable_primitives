@@ -11,7 +11,7 @@ Great for starting rough models.
   * Circle
 * Supports Linked Objects  
 Changable Primitives duplicated with Linked Duplicate will share properties.
-* Supports Modifiers
+* Supports Modifiers  
 You can add modifiers to Changable Primitives to change their shape while still being able to change their properties.
 
 ## Installation  
