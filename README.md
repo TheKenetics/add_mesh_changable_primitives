@@ -23,5 +23,7 @@ You can add a modifier empty from...
 * 3D View > Add Menu > Mesh > Changable Primtives
 * 3D View > Operator Search > Create \*Changable Primitive name\*  
 ## Notes
+Not feature complete yet.  
+
 Sometimes entering Edit mode after creating a Changable Primitive will cause odd shading to happen.  
 Leaving and entering Edit mode again usually corrects the shading.  
