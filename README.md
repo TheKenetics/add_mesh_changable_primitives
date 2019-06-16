@@ -5,6 +5,10 @@ Blender Addon that creates primitives that can be changed after they are created
 Creates Changable Primitives which are primitives that can be changed even after they are moved, rotated, scaled, etc.  
 Great for starting rough models.  
 ### Features
+* Currently support mesh types  
+  * Plane
+  * Cube
+  * Circle
 * Supports Linked Objects  
 Changable Primitives duplicated with Linked Duplicate will share properties.
 
