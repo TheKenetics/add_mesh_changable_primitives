@@ -9,8 +9,10 @@ Great for starting rough models.
   * Plane
   * Cube
   * Circle
-  * Cylinder  
+  * Cylinder 
+  * Cone  
   * UV Sphere  
+  * Icosphere  
 * Supports Linked Objects  
 Changable Primitives duplicated with Linked Duplicate will share properties.
 * Supports Modifiers  
