@@ -102,6 +102,10 @@ def update_changable_primitive(self, context):
 		bpy.ops.object.cp_ot_update_circle()
 	elif context.active_object.data.changable_primitive_settings.type == "CYLINDER":
 		bpy.ops.object.cp_ot_update_cylinder()
+	elif context.active_object.data.changable_primitive_settings.type == "CONE":
+		bpy.ops.object.cp_ot_update_cone()
+	elif context.active_object.data.changable_primitive_settings.type == "UVSPHERE":
+		bpy.ops.object.cp_ot_update_uvsphere()
 	else:
 		print("You haven't implemented " + context.active_object.data.changable_primitive_settings.type + " in master update yet!")
 
@@ -125,7 +129,7 @@ class CP_changable_primitive_settings(PropertyGroup):
 			("CUBE","Cube","","MESH_CUBE",1),
 			("CIRCLE","Circle","","MESH_CUBE",2),
 			("CYLINDER","Cylinder","","MESH_CUBE",3),
-			("SPHERE","Sphere","","MESH_CUBE",4),
+			("UVSPHERE","UV Sphere","","MESH_CUBE",4),
 			("ICOSPHERE","Icosphere","","MESH_CUBE",5),
 			("TORUS","Torus","","MESH_CUBE",6),
 			("CONE","Cone","","MESH_CUBE",7),
@@ -679,6 +683,262 @@ class CP_OT_update_cylinder(bpy.types.Operator):
 		return {'FINISHED'}
 
 
+class CP_OT_create_cone(bpy.types.Operator):
+	"""Creates a new Changable Cone"""
+	bl_idname = "object.cp_ot_create_cone"
+	bl_label = "Create Changable Cone"
+	bl_options = {'REGISTER','UNDO'}
+	
+	# Properties
+	segments : IntProperty(
+		name = "Segments",
+		default=32,
+		min=3
+	)
+	
+	u_subdivisions : IntProperty(
+		name = "Segments",
+		default=2,
+		min=2
+	)
+	
+	v_subdivisions : IntProperty(
+		name = "Segments",
+		default=2,
+		min=2
+	)
+	
+	diameter1 : FloatProperty(
+		name="Diameter 1",
+		default=1.0,
+		unit='LENGTH'
+	)
+	
+	diameter2 : FloatProperty(
+		name="Diameter 2",
+		default=0.0,
+		unit='LENGTH'
+	)
+	
+	height : FloatProperty(
+		name="Height",
+		default=1.0,
+		unit='LENGTH'
+	)
+	
+	cap_type : EnumProperty(
+		items=[
+			("NONE","No Cap","","",0),
+			("TRI","Triangle Cap","","",1),
+			("FACE","Face Cap","","",2),
+		],
+		name="Cap Type"
+	)
+	
+	align_rot_to_cursor : BoolProperty(
+		name="Align Rotation to 3D Cursor",
+		default=False
+	)
+
+	@classmethod
+	def poll(cls, context):
+		return True
+
+	def execute(self, context):
+		# Deselect all objects
+		for obj in context.selected_objects:
+			obj.select_set(False)
+		
+		# Create mesh and object
+		obj = create_and_link_mesh_object(context, "ChangableCone")
+		obj.location = context.scene.cursor.location.copy()
+		if self.align_rot_to_cursor:
+			obj.rotation_euler = context.scene.cursor.rotation_euler.copy()
+		
+		# Change draw options
+		obj.show_wire = True
+		obj.show_all_edges = True
+		
+		# Set created object as active
+		obj.select_set(True)
+		context.view_layer.objects.active = obj
+		
+		# Initialize Changable Primitive Settings
+		settings = obj.data.changable_primitive_settings
+		settings.enabled = True
+		settings.type = "CONE"
+		settings.x_subdivisions = self.segments
+		settings.y_subdivisions = self.u_subdivisions
+		settings.z_subdivisions = self.v_subdivisions
+		settings.height = self.height
+		settings.diameter1 = self.diameter1
+		settings.diameter2 = self.diameter2
+		settings.cap_type = self.cap_type
+		
+		# Create Mesh
+		bpy.ops.object.cp_ot_update_cone()
+		
+		return {'FINISHED'}
+
+
+class CP_OT_update_cone(bpy.types.Operator):
+	"""Updates a changable cone"""
+	bl_idname = "object.cp_ot_update_cone"
+	bl_label = "Update Changable Cone"
+	bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+
+	@classmethod
+	def poll(cls, context):
+		return context.active_object.type == "MESH"
+
+	def execute(self, context):
+		segments = context.active_object.data.changable_primitive_settings.x_subdivisions
+		u_subdivisions = context.active_object.data.changable_primitive_settings.y_subdivisions
+		v_subdivisions = context.active_object.data.changable_primitive_settings.z_subdivisions
+		cap_type = context.active_object.data.changable_primitive_settings.cap_type
+		height = context.active_object.data.changable_primitive_settings.height
+		diameter1 = context.active_object.data.changable_primitive_settings.diameter1
+		diameter2 = context.active_object.data.changable_primitive_settings.diameter2
+		
+		bm = bmesh.new()
+		bm.from_mesh(context.active_object.data)
+		
+		# Delete old mesh
+		if bm.verts:
+			bmesh.ops.delete(bm, geom=bm.verts, context="VERTS")
+		
+		# Create Cylinder
+		if cap_type == "NONE":
+			bmesh.ops.create_cone(bm, segments=segments, diameter1=diameter1, diameter2=diameter2, depth=height, calc_uvs=True)
+		elif cap_type == "FACE":
+			bmesh.ops.create_cone(bm, segments=segments, diameter1=diameter1, diameter2=diameter2, depth=height, cap_ends=True, calc_uvs=True)
+		else:
+			bmesh.ops.create_cone(bm, segments=segments, diameter1=diameter1, diameter2=diameter2, depth=height, cap_ends=True, cap_tris=True, calc_uvs=True)
+		
+		# Subdivide U edges
+		if u_subdivisions > 2 and cap_type == "TRI":
+			u_edges = []
+			
+			for vert in bm.verts:
+				if vert.co[0] == 0.0 and vert.co[1] == 0.0:
+					u_edges += vert.link_edges
+					
+			
+			bmesh.ops.subdivide_edges(bm, edges=u_edges, cuts=u_subdivisions-2)
+		
+		# Subdivide V edges
+		if v_subdivisions > 2:
+			v_edges = [edge for edge in bm.edges if edge_verts_distance(edge.verts, 2) > 0]
+			bmesh.ops.subdivide_edges(bm, edges=v_edges, cuts=v_subdivisions-2)
+		
+		bm.to_mesh(context.active_object.data)
+		bm.free()
+		
+		context.active_object.update_tag()
+		
+		return {'FINISHED'}
+
+
+class CP_OT_create_uvsphere(bpy.types.Operator):
+	"""Creates a new Changable UV Sphere"""
+	bl_idname = "object.cp_ot_create_uvsphere"
+	bl_label = "Create Changable UV Sphere"
+	bl_options = {'REGISTER','UNDO'}
+	
+	# Properties
+	u_subdivisions : IntProperty(
+		name = "Segments",
+		default=32,
+		min=3
+	)
+	
+	v_subdivisions : IntProperty(
+		name = "Rings",
+		default=16,
+		min=3
+	)
+	
+	diameter : FloatProperty(
+		name="Diameter",
+		default=1.0,
+		unit='LENGTH'
+	)
+	
+	align_rot_to_cursor : BoolProperty(
+		name="Align Rotation to 3D Cursor",
+		default=False
+	)
+
+	@classmethod
+	def poll(cls, context):
+		return True
+
+	def execute(self, context):
+		# Deselect all objects
+		for obj in context.selected_objects:
+			obj.select_set(False)
+		
+		# Create mesh and object
+		obj = create_and_link_mesh_object(context, "ChangableUVSphere")
+		obj.location = context.scene.cursor.location.copy()
+		if self.align_rot_to_cursor:
+			obj.rotation_euler = context.scene.cursor.rotation_euler.copy()
+		
+		# Change draw options
+		obj.show_wire = True
+		obj.show_all_edges = True
+		
+		# Set created object as active
+		obj.select_set(True)
+		context.view_layer.objects.active = obj
+		
+		# Initialize Changable Primitive Settings
+		settings = obj.data.changable_primitive_settings
+		settings.enabled = True
+		settings.type = "UVSPHERE"
+		settings.y_subdivisions = self.u_subdivisions
+		settings.z_subdivisions = self.v_subdivisions
+		settings.diameter1 = self.diameter
+		
+		# Create Mesh
+		bpy.ops.object.cp_ot_update_uvsphere()
+		
+		return {'FINISHED'}
+
+
+class CP_OT_update_uvsphere(bpy.types.Operator):
+	"""Updates a changable UV Sphere"""
+	bl_idname = "object.cp_ot_update_uvsphere"
+	bl_label = "Update Changable UV Sphere"
+	bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+
+	@classmethod
+	def poll(cls, context):
+		return context.active_object.type == "MESH"
+
+	def execute(self, context):
+		u_subdivisions = context.active_object.data.changable_primitive_settings.y_subdivisions
+		v_subdivisions = context.active_object.data.changable_primitive_settings.z_subdivisions
+		diameter = context.active_object.data.changable_primitive_settings.diameter1
+		
+		bm = bmesh.new()
+		bm.from_mesh(context.active_object.data)
+		
+		# Delete old mesh
+		if bm.verts:
+			bmesh.ops.delete(bm, geom=bm.verts, context="VERTS")
+		
+		# Create UV Sphere
+		bmesh.ops.create_uvsphere(bm, u_segments=u_subdivisions, v_segments=v_subdivisions, diameter=diameter, calc_uvs=True)
+		
+		bm.to_mesh(context.active_object.data)
+		bm.free()
+		
+		context.active_object.update_tag()
+		
+		return {'FINISHED'}
+
+
 class CP_OT_make_permenant(bpy.types.Operator):
 	"""Makes a Changable Primitive's current shape permanent. (Not able to be updated via UI anymore)"""
 	bl_idname = "object.cp_ot_make_permanent"
@@ -749,6 +1009,24 @@ class CP_PT_changable_primitive_settings(bpy.types.Panel):
 			layout.prop(obj.data.changable_primitive_settings, "diameter1", text="Diameter")
 			layout.prop(obj.data.changable_primitive_settings, "height")
 			layout.operator(CP_OT_make_permenant.bl_idname)
+		elif obj.data.changable_primitive_settings.type == "CONE":
+			layout.label(text="Cone", icon="MESH_PLANE")
+			
+			layout.prop(obj.data.changable_primitive_settings, "x_subdivisions", text="Segments")
+			layout.prop(obj.data.changable_primitive_settings, "y_subdivisions", text="U Subdivisions")
+			layout.prop(obj.data.changable_primitive_settings, "z_subdivisions", text="V Subdivisions")
+			layout.prop(obj.data.changable_primitive_settings, "cap_type")
+			layout.prop(obj.data.changable_primitive_settings, "diameter1")
+			layout.prop(obj.data.changable_primitive_settings, "diameter2")
+			layout.prop(obj.data.changable_primitive_settings, "height")
+			layout.operator(CP_OT_make_permenant.bl_idname)
+		elif obj.data.changable_primitive_settings.type == "UVSPHERE":
+			layout.label(text="UV Sphere", icon="MESH_PLANE")
+			
+			layout.prop(obj.data.changable_primitive_settings, "y_subdivisions", text="Segments")
+			layout.prop(obj.data.changable_primitive_settings, "z_subdivisions", text="Rings")
+			layout.prop(obj.data.changable_primitive_settings, "diameter1", text="Diameter")
+			layout.operator(CP_OT_make_permenant.bl_idname)
 		else:
 			layout.label(text="This one hasn't been implemented in Panel yet! " + obj.data.changable_primitive_settings.type)
 
@@ -763,6 +1041,8 @@ class CP_MT_changable_primitives_base(Menu):
 		layout.operator(CP_OT_create_cube.bl_idname, text="Cube")
 		layout.operator(CP_OT_create_circle.bl_idname, text="Circle")
 		layout.operator(CP_OT_create_cylinder.bl_idname, text="Cylinder")
+		layout.operator(CP_OT_create_cone.bl_idname, text="Cone")
+		layout.operator(CP_OT_create_uvsphere.bl_idname, text="UV Sphere")
 
 
 ## Append to UI Functions
@@ -782,6 +1062,10 @@ classes = (
 	CP_OT_update_circle,
 	CP_OT_create_cylinder,
 	CP_OT_update_cylinder,
+	CP_OT_create_cone,
+	CP_OT_update_cone,
+	CP_OT_create_uvsphere,
+	CP_OT_update_uvsphere,
 	CP_OT_make_permenant,
 	CP_PT_changable_primitive_settings,
 	CP_MT_changable_primitives_base
