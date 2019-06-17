@@ -106,6 +106,8 @@ def update_changable_primitive(self, context):
 		bpy.ops.object.cp_ot_update_cone()
 	elif context.active_object.data.changable_primitive_settings.type == "UVSPHERE":
 		bpy.ops.object.cp_ot_update_uvsphere()
+	elif context.active_object.data.changable_primitive_settings.type == "ICOSPHERE":
+		bpy.ops.object.cp_ot_update_icosphere()
 	else:
 		print("You haven't implemented " + context.active_object.data.changable_primitive_settings.type + " in master update yet!")
 
@@ -147,7 +149,7 @@ class CP_changable_primitive_settings(PropertyGroup):
 	"""
 	x_subdivisions : IntProperty(
 		name="X Subdivisions",
-		min=2,
+		min=1,
 		default=2,
 		update=update_changable_primitive
 	)
@@ -233,7 +235,7 @@ class CP_OT_create_plane(bpy.types.Operator):
 
 	@classmethod
 	def poll(cls, context):
-		return True
+		return context.mode == "OBJECT"
 
 	def execute(self, context):
 		# Deselect all objects
@@ -325,7 +327,7 @@ class CP_OT_create_cube(bpy.types.Operator):
 
 	@classmethod
 	def poll(cls, context):
-		return True
+		return context.mode == "OBJECT"
 
 	def execute(self, context):
 		# Deselect all objects
@@ -450,7 +452,7 @@ class CP_OT_create_circle(bpy.types.Operator):
 
 	@classmethod
 	def poll(cls, context):
-		return True
+		return context.mode == "OBJECT"
 
 	def execute(self, context):
 		# Deselect all objects
@@ -588,7 +590,7 @@ class CP_OT_create_cylinder(bpy.types.Operator):
 
 	@classmethod
 	def poll(cls, context):
-		return True
+		return context.mode == "OBJECT"
 
 	def execute(self, context):
 		# Deselect all objects
@@ -742,7 +744,7 @@ class CP_OT_create_cone(bpy.types.Operator):
 
 	@classmethod
 	def poll(cls, context):
-		return True
+		return context.mode == "OBJECT"
 
 	def execute(self, context):
 		# Deselect all objects
@@ -871,7 +873,7 @@ class CP_OT_create_uvsphere(bpy.types.Operator):
 
 	@classmethod
 	def poll(cls, context):
-		return True
+		return context.mode == "OBJECT"
 
 	def execute(self, context):
 		# Deselect all objects
@@ -930,6 +932,98 @@ class CP_OT_update_uvsphere(bpy.types.Operator):
 		
 		# Create UV Sphere
 		bmesh.ops.create_uvsphere(bm, u_segments=u_subdivisions, v_segments=v_subdivisions, diameter=diameter, calc_uvs=True)
+		
+		bm.to_mesh(context.active_object.data)
+		bm.free()
+		
+		context.active_object.update_tag()
+		
+		return {'FINISHED'}
+
+
+class CP_OT_create_icosphere(bpy.types.Operator):
+	"""Creates a new Changable Icosphere"""
+	bl_idname = "object.cp_ot_create_icosphere"
+	bl_label = "Create Changable Icosphere"
+	bl_options = {'REGISTER','UNDO'}
+	
+	# Properties
+	subdivisions : IntProperty(
+		name = "Subdivisions",
+		default=2,
+		min=1
+	)
+	
+	diameter : FloatProperty(
+		name="Diameter",
+		default=1.0,
+		unit='LENGTH'
+	)
+	
+	align_rot_to_cursor : BoolProperty(
+		name="Align Rotation to 3D Cursor",
+		default=False
+	)
+
+	@classmethod
+	def poll(cls, context):
+		return context.mode == "OBJECT"
+
+	def execute(self, context):
+		# Deselect all objects
+		for obj in context.selected_objects:
+			obj.select_set(False)
+		
+		# Create mesh and object
+		obj = create_and_link_mesh_object(context, "ChangableIcosphere")
+		obj.location = context.scene.cursor.location.copy()
+		if self.align_rot_to_cursor:
+			obj.rotation_euler = context.scene.cursor.rotation_euler.copy()
+		
+		# Change draw options
+		obj.show_wire = True
+		obj.show_all_edges = True
+		
+		# Set created object as active
+		obj.select_set(True)
+		context.view_layer.objects.active = obj
+		
+		# Initialize Changable Primitive Settings
+		settings = obj.data.changable_primitive_settings
+		settings.enabled = True
+		settings.type = "ICOSPHERE"
+		settings.x_subdivisions = self.subdivisions
+		settings.diameter1 = self.diameter
+		
+		# Create Mesh
+		bpy.ops.object.cp_ot_update_icosphere()
+		
+		return {'FINISHED'}
+
+
+class CP_OT_update_icosphere(bpy.types.Operator):
+	"""Updates a changable Icosphere"""
+	bl_idname = "object.cp_ot_update_icosphere"
+	bl_label = "Update Changable Icosphere"
+	bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+
+	@classmethod
+	def poll(cls, context):
+		return context.active_object.type == "MESH"
+
+	def execute(self, context):
+		subdivisions = context.active_object.data.changable_primitive_settings.x_subdivisions
+		diameter = context.active_object.data.changable_primitive_settings.diameter1
+		
+		bm = bmesh.new()
+		bm.from_mesh(context.active_object.data)
+		
+		# Delete old mesh
+		if bm.verts:
+			bmesh.ops.delete(bm, geom=bm.verts, context="VERTS")
+		
+		# Create UV Sphere
+		bmesh.ops.create_icosphere(bm, subdivisions=subdivisions, diameter=diameter, calc_uvs=True)
 		
 		bm.to_mesh(context.active_object.data)
 		bm.free()
@@ -1027,6 +1121,12 @@ class CP_PT_changable_primitive_settings(bpy.types.Panel):
 			layout.prop(obj.data.changable_primitive_settings, "z_subdivisions", text="Rings")
 			layout.prop(obj.data.changable_primitive_settings, "diameter1", text="Diameter")
 			layout.operator(CP_OT_make_permenant.bl_idname)
+		elif obj.data.changable_primitive_settings.type == "ICOSPHERE":
+			layout.label(text="Icosphere", icon="MESH_PLANE")
+			
+			layout.prop(obj.data.changable_primitive_settings, "x_subdivisions", text="Subdivisions")
+			layout.prop(obj.data.changable_primitive_settings, "diameter1", text="Diameter")
+			layout.operator(CP_OT_make_permenant.bl_idname)
 		else:
 			layout.label(text="This one hasn't been implemented in Panel yet! " + obj.data.changable_primitive_settings.type)
 
@@ -1043,6 +1143,7 @@ class CP_MT_changable_primitives_base(Menu):
 		layout.operator(CP_OT_create_cylinder.bl_idname, text="Cylinder")
 		layout.operator(CP_OT_create_cone.bl_idname, text="Cone")
 		layout.operator(CP_OT_create_uvsphere.bl_idname, text="UV Sphere")
+		layout.operator(CP_OT_create_icosphere.bl_idname, text="Icosphere")
 
 
 ## Append to UI Functions
@@ -1066,6 +1167,8 @@ classes = (
 	CP_OT_update_cone,
 	CP_OT_create_uvsphere,
 	CP_OT_update_uvsphere,
+	CP_OT_create_icosphere,
+	CP_OT_update_icosphere,
 	CP_OT_make_permenant,
 	CP_PT_changable_primitive_settings,
 	CP_MT_changable_primitives_base
@@ -1077,10 +1180,10 @@ def register():
 	
 	bpy.types.Mesh.changable_primitive_settings = bpy.props.PointerProperty(type=CP_changable_primitive_settings)
 	
-	bpy.types.VIEW3D_MT_mesh_add.append(add_changable_primitives_menu)
+	bpy.types.VIEW3D_MT_add.append(add_changable_primitives_menu)
 
 def unregister():
-	bpy.types.VIEW3D_MT_mesh_add.remove(add_changable_primitives_menu)
+	bpy.types.VIEW3D_MT_add.remove(add_changable_primitives_menu)
 	
 	del bpy.types.Mesh.changable_primitive_settings
 	
