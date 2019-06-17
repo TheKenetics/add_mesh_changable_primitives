@@ -32,6 +32,8 @@ Find where you put the ZIP file, select it, and click "Install from File"
 You can add a Changable Primitive from...
 * 3D View > Add Menu > Changable Primtives
 * 3D View > Operator Search > Create \*Changable Primitive name\*  
+
+After it is created, you can find the Changable Primitive's properties in Properties window > Mesh Data tab > Changable Primitive Settings
 ## Notes
 Not feature complete yet.  
 
