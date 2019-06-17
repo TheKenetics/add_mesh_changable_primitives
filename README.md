@@ -27,7 +27,7 @@ At the bottom, click "Install from File"
 Find where you put the ZIP file, select it, and click "Install from File" 
 
 ## Using
-You can add a modifier empty from...
+You can add a Changable Primitive from...
 * 3D View > Add Menu > Mesh > Changable Primtives
 * 3D View > Operator Search > Create \*Changable Primitive name\*  
 ## Notes
