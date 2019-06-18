@@ -13,6 +13,7 @@ Great for starting rough models.
   * Cone  
   * UV Sphere  
   * Icosphere  
+  * Torus  
 * Supports Linked Objects  
 Changable Primitives duplicated with Linked Duplicate will share properties.
 * Supports Modifiers  
@@ -33,7 +34,9 @@ You can add a Changable Primitive from...
 * 3D View > Add Menu > Changable Primtives
 * 3D View > Operator Search > Create \*Changable Primitive name\*  
 
-After it is created, you can find the Changable Primitive's properties in Properties window > Mesh Data tab > Changable Primitive Settings
+After it is created, you can find the Changable Primitive's properties in...  
+* Properties window > Mesh Data tab > Changable Primitive Settings  
+* 3D View > Sidebar > Changable Primitive Settings  
 ## Notes
 Not feature complete yet.  
 
