@@ -16,6 +16,8 @@ from bpy.types import PropertyGroup, Menu, Panel, Operator
 from mathutils import Matrix
 from math import radians
 
+# Left Off: Trying to fix circle arc face normals
+
 """
 Plan
 Objects
@@ -112,6 +114,8 @@ def update_changable_primitive(self, context):
 		bpy.ops.object.cp_ot_update_icosphere()
 	elif context.active_object.data.changable_primitive_settings.type == "TORUS":
 		bpy.ops.object.cp_ot_update_torus()
+	elif context.active_object.data.changable_primitive_settings.type == "CIRCLE_ARC":
+		bpy.ops.object.cp_ot_update_circle_arc()
 	else:
 		print("You haven't implemented " + context.active_object.data.changable_primitive_settings.type + " in master update yet!")
 
@@ -147,6 +151,8 @@ class CP_changable_primitive_settings(PropertyGroup):
 			("CONE","Cone","","MESH_CUBE",7),
 			("TUBE","Tube","","MESH_CUBE",8),
 			("ARC","Arc","","MESH_CUBE",9),
+			("CIRCLE_ARC","Circle Arc","","MESH_CUBE",10),
+			("CYLINDER_ARC","Cylinder Arc","","MESH_CUBE",11)
 			],
 		name="Type"
 	)
@@ -220,6 +226,13 @@ class CP_changable_primitive_settings(PropertyGroup):
 		description="Enables smooth shading when mesh is updated.",
 		default=False,
 		update=update_changable_primitive
+	)
+	
+	radians : FloatProperty(
+		name="Degrees",
+		default=radians(180),
+		update=update_changable_primitive,
+		unit='ROTATION'
 	)
 
 
@@ -1200,6 +1213,164 @@ class CP_OT_update_torus(Operator):
 		return {'FINISHED'}
 
 
+class CP_OT_create_circle_arc(Operator):
+	"""Creates a new Changable Circle Arc"""
+	bl_idname = "object.cp_ot_create_circle_arc"
+	bl_label = "Create Changable Circle Arc"
+	bl_options = {'REGISTER','UNDO'}
+	
+	# Properties
+	segments : IntProperty(
+		name = "Segments",
+		default=32,
+		min=3
+	)
+	
+	radians : FloatProperty(
+		name="Degrees",
+		default=radians(270),
+		unit="ROTATION"
+	)
+	
+	u_subdivisions : IntProperty(
+		name = "U Subdivisions",
+		default=2,
+		min=2
+	)
+	
+	radius : FloatProperty(
+		name="Radius",
+		default=1.0,
+		unit='LENGTH'
+	)
+	
+	cap_type : EnumProperty(
+		items=[
+			("NONE","No Cap","","",0),
+			("TRI","Triangle Cap","","",1),
+			("FACE","Face Cap","","",2),
+		],
+		name="Cap Type"
+	)
+	
+	align_rot_to_cursor : BoolProperty(
+		name="Align Rotation to 3D Cursor",
+		default=False
+	)
+
+	@classmethod
+	def poll(cls, context):
+		return context.mode == "OBJECT"
+
+	def execute(self, context):
+		# Deselect all objects
+		for obj in context.selected_objects:
+			obj.select_set(False)
+		
+		# Create mesh and object
+		obj = create_and_link_mesh_object(context, "ChangableCircleArc")
+		obj.location = context.scene.cursor.location.copy()
+		if self.align_rot_to_cursor:
+			obj.rotation_euler = context.scene.cursor.rotation_euler.copy()
+		
+		# Change draw options
+		obj.show_wire = True
+		obj.show_all_edges = True
+		
+		# Set created object as active
+		obj.select_set(True)
+		context.view_layer.objects.active = obj
+		
+		# Initialize Changable Primitive Settings
+		settings = obj.data.changable_primitive_settings
+		settings.enabled = True
+		settings.type = "CIRCLE_ARC"
+		settings.x_subdivisions = self.segments
+		settings.y_subdivisions = self.u_subdivisions
+		settings.cap_type = self.cap_type
+		settings.radius = self.radius
+		settings.radians = self.radians
+		
+		# Create Mesh
+		bpy.ops.object.cp_ot_update_circle_arc()
+		
+		return {'FINISHED'}
+
+
+class CP_OT_update_circle_arc(Operator):
+	"""Updates a changable Circle Arc"""
+	bl_idname = "object.cp_ot_update_circle_arc"
+	bl_label = "Update Changable Circle Arc"
+	bl_options = {'REGISTER','UNDO', 'INTERNAL'}
+
+	@classmethod
+	def poll(cls, context):
+		return context.active_object.type == "MESH"
+
+	def execute(self, context):
+		segments = context.active_object.data.changable_primitive_settings.x_subdivisions
+		u_subdivisions = context.active_object.data.changable_primitive_settings.y_subdivisions
+		cap_type = context.active_object.data.changable_primitive_settings.cap_type
+		radius = context.active_object.data.changable_primitive_settings.radius
+		radians = context.active_object.data.changable_primitive_settings.radians
+		use_smooth_shading = context.active_object.data.changable_primitive_settings.use_smooth_shading
+		
+		bm = bmesh.new()
+		bm.from_mesh(context.active_object.data)
+		
+		# Delete old mesh
+		if bm.verts:
+			bmesh.ops.delete(bm, geom=bm.verts, context="VERTS")
+		
+		# Create Circle Arc
+		
+		bmesh.ops.create_vert(bm, co=(radius,0,0))
+		bmesh.ops.spin(bm, geom=bm.verts, cent=(0,0,0), axis=(0,0,1), angle=radians, steps=segments)
+		
+		if cap_type == "NONE":
+			pass
+		else:
+			center_vert = bmesh.ops.create_vert(bm, co=(0,0,0))['vert'][0]
+			
+			if cap_type == "FACE":
+				bm.faces.new(bm.verts)
+			else:
+				for edge in bm.edges:
+					vert1, vert2 = edge.verts
+					
+					verts = [v for v in bm.verts if v in (center_vert, vert1, vert2)]
+					
+					bmesh.ops.contextual_create(bm, geom=verts)
+					#bm.faces.new(verts)
+		
+		if u_subdivisions > 2 and cap_type == "TRI":
+			center_vert = None
+			
+			for vert in bm.verts:
+				if vert.co[0] == 0.0 and vert.co[1] == 0.0:
+					center_vert = vert
+					break
+			
+			bmesh.ops.subdivide_edges(bm, edges=center_vert.link_edges, cuts=u_subdivisions-2)
+		bm.normal_update()
+		for face in bm.faces:
+			face.normal = (0, 0, 1)
+		
+		bm.normal_update()
+		bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+		bm.normal_update()
+		
+		bm.to_mesh(context.active_object.data)
+		bm.free()
+		
+		if use_smooth_shading:
+			enable_smooth_shading(context.active_object)
+		
+		context.active_object.update_tag()
+		
+		return {'FINISHED'}
+
+
 class CP_OT_make_permenant(Operator):
 	"""Makes a Changable Primitive's current shape permanent. (Not able to be updated via UI anymore)"""
 	bl_idname = "object.cp_ot_make_permanent"
@@ -1298,6 +1469,16 @@ def changable_primitive_settings_shared_draw(self, context):
 		layout.prop(obj.data.changable_primitive_settings, "diameter2", text="Minor Radius")
 		layout.prop(obj.data.changable_primitive_settings, "use_smooth_shading")
 		layout.operator(CP_OT_make_permenant.bl_idname, text="Make Permenant")
+	elif obj.data.changable_primitive_settings.type == "CIRCLE_ARC":
+		layout.label(text="Circle Arc", icon="MESH_PLANE")
+		
+		layout.prop(obj.data.changable_primitive_settings, "x_subdivisions", text="Segments")
+		layout.prop(obj.data.changable_primitive_settings, "y_subdivisions", text="U Segments")
+		layout.prop(obj.data.changable_primitive_settings, "radius")
+		layout.prop(obj.data.changable_primitive_settings, "radians")
+		layout.prop(obj.data.changable_primitive_settings, "cap_type")
+		layout.prop(obj.data.changable_primitive_settings, "use_smooth_shading")
+		layout.operator(CP_OT_make_permenant.bl_idname, text="Make Permenant")
 	else:
 		layout.label(text="This one hasn't been implemented in Panel yet! " + obj.data.changable_primitive_settings.type)
 
@@ -1349,6 +1530,8 @@ class CP_MT_changable_primitives_base(Menu):
 		layout.operator(CP_OT_create_uvsphere.bl_idname, text="UV Sphere")
 		layout.operator(CP_OT_create_icosphere.bl_idname, text="Icosphere")
 		layout.operator(CP_OT_create_torus.bl_idname, text="Torus")
+		layout.separator()
+		layout.operator(CP_OT_create_circle_arc.bl_idname, text="Circle Arc")
 
 
 ## Append to UI Functions
@@ -1376,6 +1559,8 @@ classes = (
 	CP_OT_update_icosphere,
 	CP_OT_create_torus,
 	CP_OT_update_torus,
+	CP_OT_create_circle_arc,
+	CP_OT_update_circle_arc,
 	CP_OT_make_permenant,
 	CP_PT_changable_primitive_settings,
 	CP_PT_changable_primitive_settings_view3d_sidebar,
