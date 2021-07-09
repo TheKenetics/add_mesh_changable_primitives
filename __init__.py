@@ -11,6 +11,7 @@ bl_info = {
 }
 
 import bpy, bmesh
+import mathutils
 from bpy.props import EnumProperty, IntProperty, IntVectorProperty, FloatVectorProperty, BoolProperty, FloatProperty, StringProperty
 from bpy.types import PropertyGroup, Menu, Panel, Operator
 from mathutils import Matrix
@@ -129,6 +130,11 @@ def enable_smooth_shading(obj):
 	for poly in obj.data.polygons:
 		poly.use_smooth = True
 
+def transform_mesh(bm, changable_primitive_settings):
+	bmesh.ops.scale(bm, verts=bm.verts, vec=changable_primitive_settings.scale_offset)
+	bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0), matrix=mathutils.Euler(changable_primitive_settings.rotation_offset).to_matrix())
+	bmesh.ops.translate(bm, verts=bm.verts, vec=changable_primitive_settings.location_offset)
+
 ## Structs
 
 class CP_changable_primitive_settings(PropertyGroup):
@@ -234,6 +240,25 @@ class CP_changable_primitive_settings(PropertyGroup):
 		update=update_changable_primitive,
 		unit='ROTATION'
 	)
+	
+	location_offset : FloatVectorProperty(
+		name = "Location Offset",
+		unit = "LENGTH",
+		update = update_changable_primitive
+	)
+	rotation_offset : FloatVectorProperty(
+		name = "Rotation Offset",
+		subtype = "EULER",
+		unit = "ROTATION",
+		update = update_changable_primitive
+	)
+	scale_offset : FloatVectorProperty(
+		name = "Scale Offset",
+		subtype = "XYZ",
+		unit = "NONE",
+		default = (1,1,1),
+		update = update_changable_primitive
+	)
 
 
 ## Operators
@@ -311,10 +336,11 @@ class CP_OT_update_plane(Operator):
 		return context.active_object.type == "MESH"
 
 	def execute(self, context):
-		x_subdivisions = context.active_object.data.changable_primitive_settings.x_subdivisions
-		y_subdivisions = context.active_object.data.changable_primitive_settings.y_subdivisions
-		size = context.active_object.data.changable_primitive_settings.height
-		use_smooth_shading = context.active_object.data.changable_primitive_settings.use_smooth_shading
+		changable_primitive_settings = context.active_object.data.changable_primitive_settings
+		x_subdivisions = changable_primitive_settings.x_subdivisions
+		y_subdivisions = changable_primitive_settings.y_subdivisions
+		size = changable_primitive_settings.height
+		use_smooth_shading = changable_primitive_settings.use_smooth_shading
 		
 		bm = bmesh.new()
 		bm.from_mesh(context.active_object.data)
@@ -322,6 +348,8 @@ class CP_OT_update_plane(Operator):
 		if bm.verts:
 			bmesh.ops.delete(bm, geom=bm.verts, context="VERTS")
 		bmesh.ops.create_grid(bm, x_segments=x_subdivisions, y_segments=y_subdivisions, size=size, calc_uvs=True)
+		
+		transform_mesh(bm, changable_primitive_settings)
 		
 		bm.to_mesh(context.active_object.data)
 		bm.free()
@@ -408,11 +436,12 @@ class CP_OT_update_cube(Operator):
 		return context.active_object.type == "MESH"
 
 	def execute(self, context):
-		x_subdivisions = context.active_object.data.changable_primitive_settings.x_subdivisions
-		y_subdivisions = context.active_object.data.changable_primitive_settings.y_subdivisions
-		z_subdivisions = context.active_object.data.changable_primitive_settings.z_subdivisions
-		size = context.active_object.data.changable_primitive_settings.height
-		use_smooth_shading = context.active_object.data.changable_primitive_settings.use_smooth_shading
+		changable_primitive_settings = context.active_object.data.changable_primitive_settings
+		x_subdivisions = changable_primitive_settings.x_subdivisions
+		y_subdivisions = changable_primitive_settings.y_subdivisions
+		z_subdivisions = changable_primitive_settings.z_subdivisions
+		size = changable_primitive_settings.height
+		use_smooth_shading = changable_primitive_settings.use_smooth_shading
 		
 		bm = bmesh.new()
 		bm.from_mesh(context.active_object.data)
@@ -436,6 +465,8 @@ class CP_OT_update_cube(Operator):
 		if z_subdivisions > 2:
 			z_edges = [edge for edge in bm.edges if edge_verts_distance(edge.verts, 2) > 0]
 			bmesh.ops.subdivide_edges(bm, edges=z_edges, cuts=z_subdivisions-2)
+		
+		transform_mesh(bm, changable_primitive_settings)
 		
 		bm.to_mesh(context.active_object.data)
 		bm.free()
@@ -537,11 +568,12 @@ class CP_OT_update_circle(Operator):
 		return context.active_object.type == "MESH"
 
 	def execute(self, context):
-		segments = context.active_object.data.changable_primitive_settings.x_subdivisions
-		u_subdivisions = context.active_object.data.changable_primitive_settings.y_subdivisions
-		cap_type = context.active_object.data.changable_primitive_settings.cap_type
-		radius = context.active_object.data.changable_primitive_settings.radius
-		use_smooth_shading = context.active_object.data.changable_primitive_settings.use_smooth_shading
+		changable_primitive_settings = context.active_object.data.changable_primitive_settings
+		segments = changable_primitive_settings.x_subdivisions
+		u_subdivisions = changable_primitive_settings.y_subdivisions
+		cap_type = changable_primitive_settings.cap_type
+		radius = changable_primitive_settings.radius
+		use_smooth_shading = changable_primitive_settings.use_smooth_shading
 		
 		bm = bmesh.new()
 		bm.from_mesh(context.active_object.data)
@@ -567,6 +599,8 @@ class CP_OT_update_circle(Operator):
 					break
 			
 			bmesh.ops.subdivide_edges(bm, edges=center_vert.link_edges, cuts=u_subdivisions-2)
+		
+		transform_mesh(bm, changable_primitive_settings)
 		
 		bm.to_mesh(context.active_object.data)
 		bm.free()
@@ -681,13 +715,14 @@ class CP_OT_update_cylinder(Operator):
 		return context.active_object.type == "MESH"
 
 	def execute(self, context):
-		segments = context.active_object.data.changable_primitive_settings.x_subdivisions
-		u_subdivisions = context.active_object.data.changable_primitive_settings.y_subdivisions
-		v_subdivisions = context.active_object.data.changable_primitive_settings.z_subdivisions
-		cap_type = context.active_object.data.changable_primitive_settings.cap_type
-		height = context.active_object.data.changable_primitive_settings.height
-		diameter = context.active_object.data.changable_primitive_settings.diameter1
-		use_smooth_shading = context.active_object.data.changable_primitive_settings.use_smooth_shading
+		changable_primitive_settings = context.active_object.data.changable_primitive_settings
+		segments = changable_primitive_settings.x_subdivisions
+		u_subdivisions = changable_primitive_settings.y_subdivisions
+		v_subdivisions = changable_primitive_settings.z_subdivisions
+		cap_type = changable_primitive_settings.cap_type
+		height = changable_primitive_settings.height
+		diameter = changable_primitive_settings.diameter1
+		use_smooth_shading = changable_primitive_settings.use_smooth_shading
 		
 		bm = bmesh.new()
 		bm.from_mesh(context.active_object.data)
@@ -719,6 +754,8 @@ class CP_OT_update_cylinder(Operator):
 		if v_subdivisions > 2:
 			v_edges = [edge for edge in bm.edges if edge_verts_distance(edge.verts, 2) > 0]
 			bmesh.ops.subdivide_edges(bm, edges=v_edges, cuts=v_subdivisions-2)
+		
+		transform_mesh(bm, changable_primitive_settings)
 		
 		bm.to_mesh(context.active_object.data)
 		bm.free()
@@ -840,14 +877,15 @@ class CP_OT_update_cone(Operator):
 		return context.active_object.type == "MESH"
 
 	def execute(self, context):
-		segments = context.active_object.data.changable_primitive_settings.x_subdivisions
-		u_subdivisions = context.active_object.data.changable_primitive_settings.y_subdivisions
-		v_subdivisions = context.active_object.data.changable_primitive_settings.z_subdivisions
-		cap_type = context.active_object.data.changable_primitive_settings.cap_type
-		height = context.active_object.data.changable_primitive_settings.height
-		diameter1 = context.active_object.data.changable_primitive_settings.diameter1
-		diameter2 = context.active_object.data.changable_primitive_settings.diameter2
-		use_smooth_shading = context.active_object.data.changable_primitive_settings.use_smooth_shading
+		changable_primitive_settings = context.active_object.data.changable_primitive_settings
+		segments = changable_primitive_settings.x_subdivisions
+		u_subdivisions = changable_primitive_settings.y_subdivisions
+		v_subdivisions = changable_primitive_settings.z_subdivisions
+		cap_type = changable_primitive_settings.cap_type
+		height = changable_primitive_settings.height
+		diameter1 = changable_primitive_settings.diameter1
+		diameter2 = changable_primitive_settings.diameter2
+		use_smooth_shading = changable_primitive_settings.use_smooth_shading
 		
 		bm = bmesh.new()
 		bm.from_mesh(context.active_object.data)
@@ -879,6 +917,8 @@ class CP_OT_update_cone(Operator):
 		if v_subdivisions > 2:
 			v_edges = [edge for edge in bm.edges if edge_verts_distance(edge.verts, 2) > 0]
 			bmesh.ops.subdivide_edges(bm, edges=v_edges, cuts=v_subdivisions-2)
+		
+		transform_mesh(bm, changable_primitive_settings)
 		
 		bm.to_mesh(context.active_object.data)
 		bm.free()
@@ -969,10 +1009,11 @@ class CP_OT_update_uvsphere(Operator):
 		return context.active_object.type == "MESH"
 
 	def execute(self, context):
-		u_subdivisions = context.active_object.data.changable_primitive_settings.y_subdivisions
-		v_subdivisions = context.active_object.data.changable_primitive_settings.z_subdivisions
-		diameter = context.active_object.data.changable_primitive_settings.diameter1
-		use_smooth_shading = context.active_object.data.changable_primitive_settings.use_smooth_shading
+		changable_primitive_settings = context.active_object.data.changable_primitive_settings
+		u_subdivisions = changable_primitive_settings.y_subdivisions
+		v_subdivisions = changable_primitive_settings.z_subdivisions
+		diameter = changable_primitive_settings.diameter1
+		use_smooth_shading = changable_primitive_settings.use_smooth_shading
 		
 		bm = bmesh.new()
 		bm.from_mesh(context.active_object.data)
@@ -983,6 +1024,8 @@ class CP_OT_update_uvsphere(Operator):
 		
 		# Create UV Sphere
 		bmesh.ops.create_uvsphere(bm, u_segments=u_subdivisions, v_segments=v_subdivisions, diameter=diameter, calc_uvs=True)
+		
+		transform_mesh(bm, changable_primitive_settings)
 		
 		bm.to_mesh(context.active_object.data)
 		bm.free()
@@ -1066,9 +1109,10 @@ class CP_OT_update_icosphere(Operator):
 		return context.active_object.type == "MESH"
 
 	def execute(self, context):
-		subdivisions = context.active_object.data.changable_primitive_settings.x_subdivisions
-		diameter = context.active_object.data.changable_primitive_settings.diameter1
-		use_smooth_shading = context.active_object.data.changable_primitive_settings.use_smooth_shading
+		changable_primitive_settings = context.active_object.data.changable_primitive_settings
+		subdivisions = changable_primitive_settings.x_subdivisions
+		diameter = changable_primitive_settings.diameter1
+		use_smooth_shading = changable_primitive_settings.use_smooth_shading
 		
 		bm = bmesh.new()
 		bm.from_mesh(context.active_object.data)
@@ -1079,6 +1123,8 @@ class CP_OT_update_icosphere(Operator):
 		
 		# Create UV Sphere
 		bmesh.ops.create_icosphere(bm, subdivisions=subdivisions, diameter=diameter, calc_uvs=True)
+		
+		transform_mesh(bm, changable_primitive_settings)
 		
 		bm.to_mesh(context.active_object.data)
 		bm.free()
@@ -1176,11 +1222,12 @@ class CP_OT_update_torus(Operator):
 		return context.active_object.type == "MESH"
 
 	def execute(self, context):
-		major_segments = context.active_object.data.changable_primitive_settings.x_subdivisions
-		minor_segments = context.active_object.data.changable_primitive_settings.y_subdivisions
-		major_radius = context.active_object.data.changable_primitive_settings.diameter1
-		minor_radius = context.active_object.data.changable_primitive_settings.diameter2
-		use_smooth_shading = context.active_object.data.changable_primitive_settings.use_smooth_shading
+		changable_primitive_settings = context.active_object.data.changable_primitive_settings
+		major_segments = changable_primitive_settings.x_subdivisions
+		minor_segments = changable_primitive_settings.y_subdivisions
+		major_radius = changable_primitive_settings.diameter1
+		minor_radius = changable_primitive_settings.diameter2
+		use_smooth_shading = changable_primitive_settings.use_smooth_shading
 		
 		bm = bmesh.new()
 		bm.from_mesh(context.active_object.data)
@@ -1201,6 +1248,8 @@ class CP_OT_update_torus(Operator):
 		double_verts = tuple(vert for vert in bm.verts if vert.co[1] < 0.00001)
 		
 		bmesh.ops.remove_doubles(bm, verts=double_verts, dist=0.0001)
+		
+		transform_mesh(bm, changable_primitive_settings)
 		
 		bm.to_mesh(context.active_object.data)
 		bm.free()
@@ -1308,12 +1357,13 @@ class CP_OT_update_circle_arc(Operator):
 		return context.active_object.type == "MESH"
 
 	def execute(self, context):
-		segments = context.active_object.data.changable_primitive_settings.x_subdivisions
-		u_subdivisions = context.active_object.data.changable_primitive_settings.y_subdivisions
-		cap_type = context.active_object.data.changable_primitive_settings.cap_type
-		radius = context.active_object.data.changable_primitive_settings.radius
-		radians = context.active_object.data.changable_primitive_settings.radians
-		use_smooth_shading = context.active_object.data.changable_primitive_settings.use_smooth_shading
+		changable_primitive_settings = context.active_object.data.changable_primitive_settings
+		segments = changable_primitive_settings.x_subdivisions
+		u_subdivisions = changable_primitive_settings.y_subdivisions
+		cap_type = changable_primitive_settings.cap_type
+		radius = changable_primitive_settings.radius
+		radians = changable_primitive_settings.radians
+		use_smooth_shading = changable_primitive_settings.use_smooth_shading
 		
 		bm = bmesh.new()
 		bm.from_mesh(context.active_object.data)
@@ -1360,6 +1410,8 @@ class CP_OT_update_circle_arc(Operator):
 		bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
 		bm.normal_update()
 		
+		transform_mesh(bm, changable_primitive_settings)
+		
 		bm.to_mesh(context.active_object.data)
 		bm.free()
 		
@@ -1403,6 +1455,9 @@ def changable_primitive_settings_shared_draw(self, context):
 		layout.prop(obj.data.changable_primitive_settings, "y_subdivisions")
 		layout.prop(obj.data.changable_primitive_settings, "height", text="Size")
 		layout.prop(obj.data.changable_primitive_settings, "use_smooth_shading")
+		layout.prop(obj.data.changable_primitive_settings, "location_offset")
+		layout.prop(obj.data.changable_primitive_settings, "rotation_offset")
+		layout.prop(obj.data.changable_primitive_settings, "scale_offset")
 		layout.operator(CP_OT_make_permenant.bl_idname, text="Make Permenant")
 	elif obj.data.changable_primitive_settings.type == "CUBE":
 		layout.label(text="Cube", icon="MESH_PLANE")
