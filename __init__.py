@@ -135,6 +135,11 @@ def transform_mesh(bm, changable_primitive_settings):
 	bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0), matrix=mathutils.Euler(changable_primitive_settings.rotation_offset).to_matrix())
 	bmesh.ops.translate(bm, verts=bm.verts, vec=changable_primitive_settings.location_offset)
 
+def draw_transform_options(layout, changable_primitive_settings):
+	layout.prop(changable_primitive_settings, "location_offset")
+	layout.prop(changable_primitive_settings, "rotation_offset")
+	layout.prop(changable_primitive_settings, "scale_offset")
+
 ## Structs
 
 class CP_changable_primitive_settings(PropertyGroup):
@@ -1455,9 +1460,7 @@ def changable_primitive_settings_shared_draw(self, context):
 		layout.prop(obj.data.changable_primitive_settings, "y_subdivisions")
 		layout.prop(obj.data.changable_primitive_settings, "height", text="Size")
 		layout.prop(obj.data.changable_primitive_settings, "use_smooth_shading")
-		layout.prop(obj.data.changable_primitive_settings, "location_offset")
-		layout.prop(obj.data.changable_primitive_settings, "rotation_offset")
-		layout.prop(obj.data.changable_primitive_settings, "scale_offset")
+		draw_transform_options(layout, obj.data.changable_primitive_settings)
 		layout.operator(CP_OT_make_permenant.bl_idname, text="Make Permenant")
 	elif obj.data.changable_primitive_settings.type == "CUBE":
 		layout.label(text="Cube", icon="MESH_PLANE")
@@ -1467,6 +1470,7 @@ def changable_primitive_settings_shared_draw(self, context):
 		layout.prop(obj.data.changable_primitive_settings, "z_subdivisions")
 		layout.prop(obj.data.changable_primitive_settings, "height", text="Size")
 		layout.prop(obj.data.changable_primitive_settings, "use_smooth_shading")
+		draw_transform_options(layout, obj.data.changable_primitive_settings)
 		layout.operator(CP_OT_make_permenant.bl_idname, text="Make Permenant")
 	elif obj.data.changable_primitive_settings.type == "CIRCLE":
 		layout.label(text="Circle", icon="MESH_PLANE")
@@ -1476,6 +1480,7 @@ def changable_primitive_settings_shared_draw(self, context):
 		layout.prop(obj.data.changable_primitive_settings, "cap_type")
 		layout.prop(obj.data.changable_primitive_settings, "radius")
 		layout.prop(obj.data.changable_primitive_settings, "use_smooth_shading")
+		draw_transform_options(layout, obj.data.changable_primitive_settings)
 		layout.operator(CP_OT_make_permenant.bl_idname, text="Make Permenant")
 	elif obj.data.changable_primitive_settings.type == "CYLINDER":
 		layout.label(text="Cylinder", icon="MESH_PLANE")
@@ -1487,6 +1492,7 @@ def changable_primitive_settings_shared_draw(self, context):
 		layout.prop(obj.data.changable_primitive_settings, "diameter1", text="Diameter")
 		layout.prop(obj.data.changable_primitive_settings, "height")
 		layout.prop(obj.data.changable_primitive_settings, "use_smooth_shading")
+		draw_transform_options(layout, obj.data.changable_primitive_settings)
 		layout.operator(CP_OT_make_permenant.bl_idname, text="Make Permenant")
 	elif obj.data.changable_primitive_settings.type == "CONE":
 		layout.label(text="Cone", icon="MESH_PLANE")
@@ -1499,6 +1505,7 @@ def changable_primitive_settings_shared_draw(self, context):
 		layout.prop(obj.data.changable_primitive_settings, "diameter2")
 		layout.prop(obj.data.changable_primitive_settings, "height")
 		layout.prop(obj.data.changable_primitive_settings, "use_smooth_shading")
+		draw_transform_options(layout, obj.data.changable_primitive_settings)
 		layout.operator(CP_OT_make_permenant.bl_idname, text="Make Permenant")
 	elif obj.data.changable_primitive_settings.type == "UVSPHERE":
 		layout.label(text="UV Sphere", icon="MESH_PLANE")
@@ -1507,6 +1514,7 @@ def changable_primitive_settings_shared_draw(self, context):
 		layout.prop(obj.data.changable_primitive_settings, "z_subdivisions", text="Rings")
 		layout.prop(obj.data.changable_primitive_settings, "diameter1", text="Diameter")
 		layout.prop(obj.data.changable_primitive_settings, "use_smooth_shading")
+		draw_transform_options(layout, obj.data.changable_primitive_settings)
 		layout.operator(CP_OT_make_permenant.bl_idname, text="Make Permenant")
 	elif obj.data.changable_primitive_settings.type == "ICOSPHERE":
 		layout.label(text="Icosphere", icon="MESH_PLANE")
@@ -1514,6 +1522,7 @@ def changable_primitive_settings_shared_draw(self, context):
 		layout.prop(obj.data.changable_primitive_settings, "x_subdivisions", text="Subdivisions")
 		layout.prop(obj.data.changable_primitive_settings, "diameter1", text="Diameter")
 		layout.prop(obj.data.changable_primitive_settings, "use_smooth_shading")
+		draw_transform_options(layout, obj.data.changable_primitive_settings)
 		layout.operator(CP_OT_make_permenant.bl_idname, text="Make Permenant")
 	elif obj.data.changable_primitive_settings.type == "TORUS":
 		layout.label(text="Torus", icon="MESH_PLANE")
@@ -1523,6 +1532,7 @@ def changable_primitive_settings_shared_draw(self, context):
 		layout.prop(obj.data.changable_primitive_settings, "diameter1", text="Major Radius")
 		layout.prop(obj.data.changable_primitive_settings, "diameter2", text="Minor Radius")
 		layout.prop(obj.data.changable_primitive_settings, "use_smooth_shading")
+		draw_transform_options(layout, obj.data.changable_primitive_settings)
 		layout.operator(CP_OT_make_permenant.bl_idname, text="Make Permenant")
 	elif obj.data.changable_primitive_settings.type == "CIRCLE_ARC":
 		layout.label(text="Circle Arc", icon="MESH_PLANE")
@@ -1533,6 +1543,7 @@ def changable_primitive_settings_shared_draw(self, context):
 		layout.prop(obj.data.changable_primitive_settings, "radians")
 		layout.prop(obj.data.changable_primitive_settings, "cap_type")
 		layout.prop(obj.data.changable_primitive_settings, "use_smooth_shading")
+		draw_transform_options(layout, obj.data.changable_primitive_settings)
 		layout.operator(CP_OT_make_permenant.bl_idname, text="Make Permenant")
 	else:
 		layout.label(text="This one hasn't been implemented in Panel yet! " + obj.data.changable_primitive_settings.type)
