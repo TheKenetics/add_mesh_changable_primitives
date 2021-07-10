@@ -923,6 +923,15 @@ class CP_OT_update_cone(Operator):
 			v_edges = [edge for edge in bm.edges if edge_verts_distance(edge.verts, 2) > 0]
 			bmesh.ops.subdivide_edges(bm, edges=v_edges, cuts=v_subdivisions-2)
 		
+		# Keep double sided from happening
+		if segments == 2:
+			bm.faces.ensure_lookup_table()
+			faces = []
+			for face in bm.faces:
+				if face.normal[0] < 0:
+					faces.append(face)
+			bmesh.ops.delete(bm, geom=faces, context="FACES_ONLY")
+		
 		transform_mesh(bm, changable_primitive_settings)
 		
 		bm.to_mesh(context.active_object.data)
