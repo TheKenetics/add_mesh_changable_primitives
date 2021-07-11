@@ -12,6 +12,7 @@ bl_info = {
 
 import bpy, bmesh
 import mathutils
+import math
 from bpy.props import EnumProperty, IntProperty, IntVectorProperty, FloatVectorProperty, BoolProperty, FloatProperty, StringProperty
 from bpy.types import PropertyGroup, Menu, Panel, Operator
 from mathutils import Matrix
@@ -1378,6 +1379,7 @@ class CP_OT_update_circle_arc(Operator):
 		radius = changable_primitive_settings.radius
 		radians = changable_primitive_settings.radians
 		use_smooth_shading = changable_primitive_settings.use_smooth_shading
+		extrude = changable_primitive_settings.height
 		
 		bm = bmesh.new()
 		bm.from_mesh(context.active_object.data)
@@ -1423,6 +1425,11 @@ class CP_OT_update_circle_arc(Operator):
 		bm.normal_update()
 		bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
 		bm.normal_update()
+		
+		if not math.isclose(extrude, 0.0):
+			extrusion = bmesh.ops.extrude_edge_only(bm, edges=bm.edges)["geom"]
+			verts_extrude_b = [ele for ele in extrusion if isinstance(ele, bmesh.types.BMVert)]
+			bmesh.ops.translate(bm, verts=verts_extrude_b, vec=(0,0,extrude))
 		
 		transform_mesh(bm, changable_primitive_settings)
 		
@@ -1549,6 +1556,7 @@ def changable_primitive_settings_shared_draw(self, context):
 		layout.prop(obj.data.changable_primitive_settings, "x_subdivisions", text="Segments")
 		layout.prop(obj.data.changable_primitive_settings, "y_subdivisions", text="U Segments")
 		layout.prop(obj.data.changable_primitive_settings, "radius")
+		layout.prop(obj.data.changable_primitive_settings, "height", text="Extrude")
 		layout.prop(obj.data.changable_primitive_settings, "radians")
 		layout.prop(obj.data.changable_primitive_settings, "cap_type")
 		layout.prop(obj.data.changable_primitive_settings, "use_smooth_shading")
